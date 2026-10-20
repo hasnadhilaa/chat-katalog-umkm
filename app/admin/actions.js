@@ -127,3 +127,67 @@ export async function tambahProduk(prevStateOrFormData, maybeFormData) {
   revalidatePath("/admin");
   redirect("/admin");
 }
+
+export async function ubahProduk(arg1, arg2, arg3) {
+  let boundId = null;
+  let formData = null;
+
+  if (typeof arg1 === "string" || typeof arg1 === "number") {
+    boundId = arg1;
+    formData =
+      arg3 instanceof FormData ? arg3 : arg2 instanceof FormData ? arg2 : null;
+  } else {
+    formData =
+      arg2 instanceof FormData ? arg2 : arg1 instanceof FormData ? arg1 : null;
+  }
+
+  const supabase = await createSessionClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { error: "Tidak diizinkan: Anda harus login sebagai admin." };
+  }
+
+  const id = boundId || formData?.get("id");
+  if (!id) {
+    return { error: "ID produk tidak valid." };
+  }
+
+  const nama = formData?.get("nama")?.toString().trim();
+  const hargaRaw = formData?.get("harga");
+  const harga = parseInt(hargaRaw, 10);
+  const kategori = formData?.get("kategori")?.toString().trim();
+  const foto_url = formData?.get("foto_url")?.toString().trim();
+  const deskripsi = formData?.get("deskripsi")?.toString().trim();
+
+  if (!nama) {
+    return { error: "Nama produk wajib diisi." };
+  }
+
+  if (isNaN(harga) || harga < 0) {
+    return { error: "Harga harus berupa angka dan tidak boleh negatif." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("produk")
+    .update({
+      nama,
+      harga,
+      kategori: kategori || null,
+      foto_url: foto_url || null,
+      deskripsi: deskripsi || null,
+    })
+    .eq("id", id);
+
+  if (updateError) {
+    return { error: `Gagal mengubah produk: ${updateError.message}` };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath(`/produk/${id}`);
+  redirect("/admin");
+}
